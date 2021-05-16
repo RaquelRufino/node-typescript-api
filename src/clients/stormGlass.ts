@@ -1,6 +1,7 @@
-import axios, { AxiosStatic } from "axios";
-import { InternalError } from "@src/util/errors/internal-error";
+import { InternalError } from '@src/util/errors/internal-error';
 import config, { IConfig } from 'config';
+// Another way to have similar behaviour to TS namespaces
+import * as HTTPUtil from '@src/util/request';
 
 export interface StormGlassPointSource {
   [key: string]: number;
@@ -48,7 +49,7 @@ export class StormGlassUnexpectedResponseError extends InternalError {
 export class ClientRequestError extends InternalError {
   constructor(message: string) {
     const internalMessage =
-      "Unexpected error when trying to communicate to StormGlass";
+        'Unexpected error when trying to communicate to StormGlass';
     super(`${internalMessage}: ${message}`);
   }
 }
@@ -56,7 +57,7 @@ export class ClientRequestError extends InternalError {
 export class StormGlassResponseError extends InternalError {
   constructor(message: string) {
     const internalMessage =
-      "Unexpected error returned by the StormGlass service";
+        'Unexpected error returned by the StormGlass service';
     super(`${internalMessage}: ${message}`);
   }
 }
@@ -64,46 +65,48 @@ export class StormGlassResponseError extends InternalError {
 /**
  * We could have proper type for the configuration
  */
-const stormGlassResourceConfig: IConfig = config.get('App.resources.StormGlass')
+const stormglassResourceConfig: IConfig = config.get(
+    'App.resources.StormGlass'
+);
 
 export class StormGlass {
   readonly stormGlassAPIParams =
-    "swellDirection,swellHeight,swellPeriod,waveDirection,waveHeight,windDirection,windSpeed";
-  readonly stormGlassAPISource = "noaa";
+      'swellDirection,swellHeight,swellPeriod,waveDirection,waveHeight,windDirection,windSpeed';
+  readonly stormGlassAPISource = 'noaa';
 
-  constructor(protected request: AxiosStatic = axios) {}
+  constructor(protected request = new HTTPUtil.Request()) {}
 
   public async fetchPoints(lat: number, lng: number): Promise<ForecastPoint[]> {
     try {
       const response = await this.request.get<StormGlassForecastResponse>(
-          `${stormGlassResourceConfig.get(
+          `${stormglassResourceConfig.get(
               'apiUrl'
           )}/weather/point?lat=${lat}&lng=${lng}&params=${
               this.stormGlassAPIParams
           }&source=${this.stormGlassAPISource}`,
           {
-          headers: {
-            Authorization: "fake-token",
-          },
-        }
+            headers: {
+              Authorization: stormglassResourceConfig.get('apiToken'),
+            },
+          }
       );
       return this.normalizeResponse(response.data);
     } catch (err) {
       /**
        * This is handling the Axios errors specifically
        */
-      if (err.response && err.response.status) {
+      if (HTTPUtil.Request.isRequestError(err)) {
         throw new StormGlassResponseError(
-          `Error: ${JSON.stringify(err.response.data)} Code: ${
-            err.response.status
-          }`
+            `Error: ${JSON.stringify(err.response.data)} Code: ${
+                err.response.status
+            }`
         );
       }
       throw new ClientRequestError(err.message);
     }
   }
   private normalizeResponse(
-    points: StormGlassForecastResponse
+      points: StormGlassForecastResponse
   ): ForecastPoint[] {
     return points.hours.filter(this.isValidPoint.bind(this)).map((point) => ({
       swellDirection: point.swellDirection[this.stormGlassAPISource],
@@ -119,14 +122,14 @@ export class StormGlass {
 
   private isValidPoint(point: Partial<StormGlassPoint>): boolean {
     return !!(
-      point.time &&
-      point.swellDirection?.[this.stormGlassAPISource] &&
-      point.swellHeight?.[this.stormGlassAPISource] &&
-      point.swellPeriod?.[this.stormGlassAPISource] &&
-      point.waveDirection?.[this.stormGlassAPISource] &&
-      point.waveHeight?.[this.stormGlassAPISource] &&
-      point.windDirection?.[this.stormGlassAPISource] &&
-      point.windSpeed?.[this.stormGlassAPISource]
+        point.time &&
+        point.swellDirection?.[this.stormGlassAPISource] &&
+        point.swellHeight?.[this.stormGlassAPISource] &&
+        point.swellPeriod?.[this.stormGlassAPISource] &&
+        point.waveDirection?.[this.stormGlassAPISource] &&
+        point.waveHeight?.[this.stormGlassAPISource] &&
+        point.windDirection?.[this.stormGlassAPISource] &&
+        point.windSpeed?.[this.stormGlassAPISource]
     );
   }
 }
