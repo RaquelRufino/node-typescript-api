@@ -1,5 +1,6 @@
 import axios, { AxiosStatic } from "axios";
-import {InternalError} from "@src/util/errors/internal-error";
+import { InternalError } from "@src/util/errors/internal-error";
+import config, { IConfig } from 'config';
 
 export interface StormGlassPointSource {
   [key: string]: number;
@@ -47,7 +48,7 @@ export class StormGlassUnexpectedResponseError extends InternalError {
 export class ClientRequestError extends InternalError {
   constructor(message: string) {
     const internalMessage =
-        'Unexpected error when trying to communicate to StormGlass';
+      "Unexpected error when trying to communicate to StormGlass";
     super(`${internalMessage}: ${message}`);
   }
 }
@@ -55,10 +56,15 @@ export class ClientRequestError extends InternalError {
 export class StormGlassResponseError extends InternalError {
   constructor(message: string) {
     const internalMessage =
-        'Unexpected error returned by the StormGlass service';
+      "Unexpected error returned by the StormGlass service";
     super(`${internalMessage}: ${message}`);
   }
 }
+
+/**
+ * We could have proper type for the configuration
+ */
+const stormGlassResourceConfig: IConfig = config.get('App.resources.StormGlass')
 
 export class StormGlass {
   readonly stormGlassAPIParams =
@@ -70,12 +76,16 @@ export class StormGlass {
   public async fetchPoints(lat: number, lng: number): Promise<ForecastPoint[]> {
     try {
       const response = await this.request.get<StormGlassForecastResponse>(
-          `https://api.stormglass.io/v2/weather/point?lat=${lat}&lng=${lng}&params=${this.stormGlassAPIParams}&source=${this.stormGlassAPISource}`,
+          `${stormGlassResourceConfig.get(
+              'apiUrl'
+          )}/weather/point?lat=${lat}&lng=${lng}&params=${
+              this.stormGlassAPIParams
+          }&source=${this.stormGlassAPISource}`,
           {
-            headers: {
-              Authorization: "fake-token",
-            },
-          }
+          headers: {
+            Authorization: "fake-token",
+          },
+        }
       );
       return this.normalizeResponse(response.data);
     } catch (err) {
@@ -84,9 +94,9 @@ export class StormGlass {
        */
       if (err.response && err.response.status) {
         throw new StormGlassResponseError(
-            `Error: ${JSON.stringify(err.response.data)} Code: ${
-                err.response.status
-            }`
+          `Error: ${JSON.stringify(err.response.data)} Code: ${
+            err.response.status
+          }`
         );
       }
       throw new ClientRequestError(err.message);
