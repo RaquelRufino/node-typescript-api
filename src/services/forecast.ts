@@ -1,6 +1,9 @@
-import { StormGlass, ForecastPoint } from "@src/clients/stormGlass";
-import { InternalError } from "@src/util/errors/internal-error";
-import { Beach } from "@src/models/beach";
+import { StormGlass, ForecastPoint } from '@src/clients/stormGlass';
+import { InternalError } from '@src/util/errors/internal-error';
+import { Beach } from '@src/models/beach';
+import logger from '@src/logger';
+
+export interface BeachForecast extends Omit<Beach, 'user'>, ForecastPoint {}
 
 export interface TimeForecast {
   time: string;
@@ -13,15 +16,14 @@ export class ForecastProcessingInternalError extends InternalError {
   }
 }
 
-export interface BeachForecast extends Omit<Beach, "user">, ForecastPoint {}
-
 export class Forecast {
   constructor(protected stormGlass = new StormGlass()) {}
 
   public async processForecastForBeaches(
-    beaches: Beach[]
+      beaches: Beach[]
   ): Promise<TimeForecast[]> {
     const pointsWithCorrectSources: BeachForecast[] = [];
+    logger.info(`Preparing the forecast for ${beaches.length} beaches`);
     try {
       for (const beach of beaches) {
         const points = await this.stormGlass.fetchPoints(beach.lat, beach.lng);
@@ -30,9 +32,11 @@ export class Forecast {
       }
       return this.mapForecastByTime(pointsWithCorrectSources);
     } catch (error) {
+      logger.error(error);
       throw new ForecastProcessingInternalError(error.message);
     }
   }
+
   private mapForecastByTime(forecast: BeachForecast[]): TimeForecast[] {
     const forecastByTime: TimeForecast[] = [];
     for (const point of forecast) {
@@ -50,8 +54,8 @@ export class Forecast {
   }
 
   private enrichBeachData(
-    points: ForecastPoint[],
-    beach: Beach
+      points: ForecastPoint[],
+      beach: Beach
   ): BeachForecast[] {
     return points.map((e) => ({
       ...{},
