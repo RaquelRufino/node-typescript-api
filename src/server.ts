@@ -67,7 +67,7 @@ export class SetupServer extends Server {
   public async close(): Promise<void> {
     await database.close();
     if (this.server) {
-      await new Promise((resolve, reject) => {
+      await new Promise<void>((resolve, reject) => {
         this.server?.close((err) => {
           if (err) {
             return reject(err);
